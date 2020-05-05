@@ -76,6 +76,8 @@ def train_network(sess, model):
     merge = tf.summary.merge_all()
     train_writer = tf.summary.FileWriter(LOG_DIR, sess.graph)
     sess.run(tf.global_variables_initializer())
+
+    ## Preload and resume training
     if model_train_continue:
         checkpoint = tf.train.get_checkpoint_state(SAVED_NETWORK)
         if checkpoint and checkpoint.model_checkpoint_path:
@@ -90,6 +92,7 @@ def train_network(sess, model):
 
     game_diff_record_all = []
 
+    ## Training loop
     while True:
         game_diff_record_dict = {}
         iteration_now = game_number / number_of_total_game + 1
@@ -107,7 +110,8 @@ def train_network(sess, model):
                     game_starting_point += 1
                     if game_number_checkpoint + 1 > game_starting_point:
                         continue
-
+            
+            ##Read in reward, state, and trace from files
             v_diff_record = []
             game_number += 1
             game_cost_record = []
@@ -126,6 +130,8 @@ def train_network(sess, model):
             except:
                 print("\n" + dir_game)
                 raise ValueError("reward wrong")
+            
+            ##Formats inputs for input into LSTM
             state_input = sio.loadmat(DATA_STORE + "/" + dir_game + "/" + state_input_name)
             state_input = (state_input['dynamic_feature_input'])
             state_trace_length = sio.loadmat(DATA_STORE + "/" + dir_game + "/" + state_trace_length_name)
