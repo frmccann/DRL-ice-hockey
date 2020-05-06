@@ -12,17 +12,12 @@ class GameProcessor:
 
     def sample(self):
         data = []
-        # data = pd.DataFrame(columns = self.df_mvmt.columns)
-        # print(data)
         num_rows = self.df_mvmt.shape[0]
-        for i in range(num_rows)[::self.sample_factor*11]:
-            # print(i, row)
+        indices = self.df_mvmt['radius'].to_numpy().nonzero()[0]
+        for i in indices[::self.sample_factor]:
             rows = self.df_mvmt[i:i+11]
-            # print(i, rows)
             data.append(rows)
-
         df = pd.concat(data)
-
         return df
 
     def rolling_average(self, num_average):
@@ -37,7 +32,9 @@ class GameProcessor:
         for episode in episodes:
             idx+=1
             try:
-                chunks.append(self.process_episode(episode))
+                processed_ep = self.process_episode(episode)
+                if processed_ep not None:
+                    chunks.append(processed_ep)
             except Exception as e: 
                 errors+=1
                 print(e)
@@ -63,8 +60,11 @@ class GameProcessor:
         return episodes
 
     def process_episode(self, episode):
-        evt_index = episode['event_id'].iloc[0]
-        event = self.df_evt['EVENTMSGTYPE'].iloc[evt_index]
+        evt_num = episode['event_id'].iloc[0]
+        df_n = self.df_evt[self.df_evt.EVENTNUM == evt_num]
+        if df_n.empty:
+            return None
+        event = self.df_evt['EVENTMSGTYPE'].iloc[0]
         print("event:",event)
         reward = self.reward_map[event]
         print("reward:",reward)
