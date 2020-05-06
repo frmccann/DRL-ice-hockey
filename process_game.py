@@ -132,7 +132,7 @@ def test():
     csv_event = '../nba-movement-data/data/events/0021500490.csv'
     gp = GameProcessor(csv_movement, csv_event, reward_map)
     episodes= gp.process_game()
-    np.save('test',episodes,allow_pickle=True,fix_imports=True)
+    np.save('./pickles/test',episodes,allow_pickle=True,fix_imports=True)
 
     # r, o, l = gp.process_game()[1]
     # print('r', r)
