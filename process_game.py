@@ -64,16 +64,22 @@ class GameProcessor:
 
 	def process_episode(self, episode):
 		evt_index = episode['event_id'].iloc[0]
-		event = self.df_evt['EVENTMSGTYPE'].iloc[0]
-		# print(event)
+		event = self.df_evt['EVENTMSGTYPE'].iloc[evt_index]
+		print("event:",event)
 		reward = self.reward_map[event]
+		print("reward:",reward)
 		observations = []
 		actions_1 = []
 		actions_2 = []
 		prev_obs = np.zeros(24)
 		# print('ep', episode)
 		indices = range(episode.shape[0])[::11]
-		for i in indices:
+		tl=len(indices)
+		if tl>MAX_TRACE_LENGTH:
+			start_idx=tl-MAX_TRACE_LENGTH
+		else:
+			start_idx=0
+		for i in indices[start_idx:]:
 
 			rows = episode[i:i+11]
 			# print('rows', rows)
