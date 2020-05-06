@@ -79,6 +79,8 @@ class GameProcessor:
 			start_idx=tl-MAX_TRACE_LENGTH
 		else:
 			start_idx=0
+		for i in range(0,start_idx):
+    		observations.append(np.zeros(24))
 		for i in indices[start_idx:]:
 
 			rows = episode[i:i+11]
