@@ -5,21 +5,20 @@ import scipy.io as sio
 import numpy as np
 from nn.td_prediction_lstm_V3 import td_prediction_lstm_V3
 from nn.td_prediction_lstm_V4 import td_prediction_lstm_V4
-from utils import handle_trace_length, get_together_training_batch, compromise_state_trace_length
-from configuration import MODEL_TYPE, MAX_TRACE_LENGTH, FEATURE_NUMBER, BATCH_SIZE, GAMMA, H_SIZE, \
-    model_train_continue, FEATURE_TYPE, ITERATE_NUM, learning_rate, SPORT, save_mother_dir
+from utils import handle_trace_length, get_together_training_batch_nba, compromise_state_trace_length
+from configuration import MODEL_TYPE, MAX_TRACE_LENGTH, FEATURE_NUMBER, BATCH_SIZE, GAMMA, H_SIZE, model_train_continue, FEATURE_TYPE, ITERATE_NUM, learning_rate, SPORT, save_mother_dir
 
-LOG_DIR = save_mother_dir + "/models/hybrid_sl_log_NN/Scale-three-cut_together_log_train_feature" + str(
+LOG_DIR = save_mother_dir + "/log/Scale-three-cut_together_log_train_feature" + str(
     FEATURE_TYPE) + "_batch" + str(
     BATCH_SIZE) + "_iterate" + str(
     ITERATE_NUM) + "_lr" + str(
     learning_rate) + "_" + str(MODEL_TYPE) + "_MaxTL" + str(MAX_TRACE_LENGTH)
-SAVED_NETWORK = save_mother_dir + "/models/hybrid_sl_saved_NN/Scale-three-cut_together_saved_networks_feature" + str(
+SAVED_NETWORK = save_mother_dir + "/log/Scale-three-cut_together_saved_networks_feature" + str(
     FEATURE_TYPE) + "_batch" + str(
     BATCH_SIZE) + "_iterate" + str(
     ITERATE_NUM) + "_lr" + str(
     learning_rate) + "_" + str(MODEL_TYPE) + "_MaxTL" + str(MAX_TRACE_LENGTH)
-DATA_STORE = "your-data-dir"
+DATA_STORE = "./pickles"
 
 DIR_GAMES_ALL = os.listdir(DATA_STORE)
 number_of_total_game = len(DIR_GAMES_ALL)
@@ -115,118 +114,87 @@ def train_network(sess, model):
             v_diff_record = []
             game_number += 1
             game_cost_record = []
-            game_files = os.listdir(DATA_STORE + "/" + dir_game)
+            game_files = os.listdir(DATA_STORE)
+            game_info_list=[]
             for filename in game_files:
-                if "dynamic_rnn_reward" in filename:
-                    reward_name = filename
-                elif "dynamic_rnn_input" in filename:
-                    state_input_name = filename
-                elif "trace" in filename:
-                    state_trace_length_name = filename
+                game_info_list.append(np.load("./pickles/test.npy",allow_pickle=True))               
 
-            reward = sio.loadmat(DATA_STORE + "/" + dir_game + "/" + reward_name)
-            try:
-                reward = reward['dynamic_rnn_reward']
-            except:
-                print("\n" + dir_game)
-                raise ValueError("reward wrong")
-            
-            ##Formats inputs for input into LSTM
-            state_input = sio.loadmat(DATA_STORE + "/" + dir_game + "/" + state_input_name)
-            state_input = (state_input['dynamic_feature_input'])
-            state_trace_length = sio.loadmat(DATA_STORE + "/" + dir_game + "/" + state_trace_length_name)
-            state_trace_length = (state_trace_length['hybrid_trace_length'])[0]
-            state_trace_length = handle_trace_length(state_trace_length)
-            state_trace_length, state_input, reward = compromise_state_trace_length(state_trace_length, state_input,
-                                                                                    reward, MAX_TRACE_LENGTH)
+            for game in game_info_list:
+                for reward, observations, sequence_length,event_type in game:
+                    train_number=0
+                    s_t0 = observations[train_number]
+                    
+                    while True:
+                        # try:
+                        batch_return, train_number, s_tl = get_together_training_batch_nba(s_t0,observations,reward,train_number,sequence_length,1,event_type,BATCH_SIZE)
 
-            print("\n load file" + str(dir_game) + " success")
-            reward_count = sum(reward)
-            print("reward number" + str(reward_count))
-            if len(state_input) != len(reward) or len(state_trace_length) != len(reward):
-                raise Exception('state length does not equal to reward length')
+                        # get the batch variables
+                        s_t0_batch = [d[0] for d in batch_return]
+                        s_t1_batch = [d[1] for d in batch_return]
+                        r_t_batch = [d[2] for d in batch_return]
+                        trace_t0_batch=[1 for i in s_t0_batch]
+                        trace_t1_batch=[1 for i in s_t1_batch]
+                        # trace_t0_batch = [d[3] for d in batch_return]
+                        # trace_t1_batch = [d[4] for d in batch_return]
+                        y_batch = []
 
-            train_len = len(state_input)
-            train_number = 0
-            s_t0 = state_input[train_number]
-            train_number += 1
+                        [outputs_t1, readout_t1_batch] = sess.run([model.outputs, model.read_out],
+                                                                feed_dict={model.trace_lengths: trace_t1_batch,
+                                                                            model.rnn_input: s_t1_batch})
 
-            while True:
-                # try:
-                batch_return, train_number, s_tl = get_together_training_batch(s_t0,
-                                                                               state_input,
-                                                                               reward,
-                                                                               train_number,
-                                                                               train_len,
-                                                                               state_trace_length,
-                                                                               BATCH_SIZE)
+                        for i in range(0, len(batch_return)):
+                            terminal = batch_return[i][3]
+                            cut = batch_return[i][4]
+                            # if terminal, only equals reward
+                            if terminal or cut:
+                                y_home = float((r_t_batch[i])[0])
+                                y_away = float((r_t_batch[i])[1])
+                                y_batch.append([y_home, y_away])
+                                break
+                            else:
+                                y_home = float((r_t_batch[i])[0]) + GAMMA * ((readout_t1_batch[i]).tolist())[0]
+                                y_away = float((r_t_batch[i])[1]) + GAMMA * ((readout_t1_batch[i]).tolist())[1]
+                    
+                                y_batch.append([y_home, y_away])
 
-                # get the batch variables
-                s_t0_batch = [d[0] for d in batch_return]
-                s_t1_batch = [d[1] for d in batch_return]
-                r_t_batch = [d[2] for d in batch_return]
-                trace_t0_batch = [d[3] for d in batch_return]
-                trace_t1_batch = [d[4] for d in batch_return]
-                y_batch = []
+                        # perform gradient step
+                        y_batch = np.asarray(y_batch)
+                        [diff, read_out, cost_out, summary_train, _] = sess.run(
+                            [model.diff, model.read_out, model.cost, merge, model.train_step],
+                            feed_dict={model.y: y_batch,
+                                    model.trace_lengths: trace_t0_batch,
+                                    model.rnn_input: s_t0_batch})
 
-                [outputs_t1, readout_t1_batch] = sess.run([model.outputs, model.read_out],
-                                                          feed_dict={model.trace_lengths: trace_t1_batch,
-                                                                     model.rnn_input: s_t1_batch})
+                        v_diff_record.append(diff)
 
-                for i in range(0, len(batch_return)):
-                    terminal = batch_return[i][5]
-                    cut = batch_return[i][6]
-                    # if terminal, only equals reward
-                    if terminal or cut:
-                        y_home = float((r_t_batch[i])[0])
-                        y_away = float((r_t_batch[i])[1])
-                        y_end = float((r_t_batch[i])[2])
-                        y_batch.append([y_home, y_away, y_end])
-                        break
-                    else:
-                        y_home = float((r_t_batch[i])[0]) + GAMMA * ((readout_t1_batch[i]).tolist())[0]
-                        y_away = float((r_t_batch[i])[1]) + GAMMA * ((readout_t1_batch[i]).tolist())[1]
-                        y_end = float((r_t_batch[i])[2]) + GAMMA * ((readout_t1_batch[i]).tolist())[2]
-                        y_batch.append([y_home, y_away, y_end])
+                        if cost_out > 0.0001:
+                            converge_flag = False
+                        global_counter += 1
+                        game_cost_record.append(cost_out)
+                        train_writer.add_summary(summary_train, global_step=global_counter)
+                        s_t0 = s_tl
 
-                # perform gradient step
-                y_batch = np.asarray(y_batch)
-                [diff, read_out, cost_out, summary_train, _] = sess.run(
-                    [model.diff, model.read_out, model.cost, merge, model.train_step],
-                    feed_dict={model.y: y_batch,
-                               model.trace_lengths: trace_t0_batch,
-                               model.rnn_input: s_t0_batch})
+                        # print info
+                        if terminal or ((train_number - 1) / BATCH_SIZE) % 5 == 1:
+                            print("TIMESTEP:", train_number, "Game:", game_number)
+                            home_avg = sum(read_out[:, 0]) / len(read_out[:, 0])
+                            away_avg = sum(read_out[:, 1]) / len(read_out[:, 1])
+                            end_avg = sum(read_out[:, 2]) / len(read_out[:, 2])
+                            print("home average:{0}, away average:{1}, end average:{2}".format(str(home_avg), str(away_avg),
+                                                                                            str(end_avg)))
+                            print("cost of the network is" + str(cost_out))
 
-                v_diff_record.append(diff)
+                        if terminal:
+                            # save progress after a game
+                            saver.save(sess, SAVED_NETWORK + '/' + SPORT + '-game-', global_step=game_number)
+                            v_diff_record_average = sum(v_diff_record) / len(v_diff_record)
+                            game_diff_record_dict.update({dir_game: v_diff_record_average})
+                            break
 
-                if cost_out > 0.0001:
-                    converge_flag = False
-                global_counter += 1
-                game_cost_record.append(cost_out)
-                train_writer.add_summary(summary_train, global_step=global_counter)
-                s_t0 = s_tl
-
-                # print info
-                if terminal or ((train_number - 1) / BATCH_SIZE) % 5 == 1:
-                    print("TIMESTEP:", train_number, "Game:", game_number)
-                    home_avg = sum(read_out[:, 0]) / len(read_out[:, 0])
-                    away_avg = sum(read_out[:, 1]) / len(read_out[:, 1])
-                    end_avg = sum(read_out[:, 2]) / len(read_out[:, 2])
-                    print("home average:{0}, away average:{1}, end average:{2}".format(str(home_avg), str(away_avg),
-                                                                                       str(end_avg)))
-                    print("cost of the network is" + str(cost_out))
-
-                if terminal:
-                    # save progress after a game
-                    saver.save(sess, SAVED_NETWORK + '/' + SPORT + '-game-', global_step=game_number)
-                    v_diff_record_average = sum(v_diff_record) / len(v_diff_record)
-                    game_diff_record_dict.update({dir_game: v_diff_record_average})
-                    break
-
-                    # break
-            cost_per_game_average = sum(game_cost_record) / len(game_cost_record)
-            write_game_average_csv([{"iteration": str(game_number / number_of_total_game + 1), "game": game_number,
-                                     "cost_per_game_average": cost_per_game_average}])
+                            # break
+                    cost_per_game_average = sum(game_cost_record) / len(game_cost_record)
+                    write_game_average_csv([{"iteration": str(game_number / number_of_total_game + 1), "game": game_number,
+                                            "cost_per_game_average": cost_per_game_average}])
 
         game_diff_record_all.append(game_diff_record_dict)
 

@@ -1,5 +1,5 @@
 import numpy as np
-from configuration import FEATURE_NUMBER
+from configuration import *
 
 
 def handle_trace_length(state_trace_length):
@@ -14,13 +14,13 @@ def handle_trace_length(state_trace_length):
 
     return trace_length_record
 
-
-def get_together_training_batch(s_t0, state_input, reward, train_number, train_len, state_trace_length, BATCH_SIZE):
+def get_together_training_sequence_nba(s_t0, episodes, reward, train_number, train_len,possesion, event_type,BATCH_SIZE,max_tl):
     """
     we generate the training batch, your can write your own method.
     in our dataset, 1 means home score, -1 means away score, we transfer it to one-hot representation:
     reward  = [If_home_score, If_away_score, If_NeitherTeam_score]
     :return:
+    batch_return is [s,s',r, if_game_end, if_score_in_the_last_time_step]
     batch_return is [s,s',r,s_play_length,s'_play_length, if_game_end, if_score_in_the_last_time_step]
     train_number is the current where we stop training
     s_t0 is the s for the next batch
@@ -28,95 +28,134 @@ def get_together_training_batch(s_t0, state_input, reward, train_number, train_l
     batch_return = []
     current_batch_length = 0
     while current_batch_length < BATCH_SIZE:
-        s_t1 = state_input[train_number]
-        if len(s_t1) < 10 or len(s_t0) < 10:
-            raise ValueError("wrong length of s")
-            # train_number += 1
-            # continue
-        s_length_t1 = state_trace_length[train_number]
-        s_length_t0 = state_trace_length[train_number - 1]
-        if s_length_t1 > 10:  # if trace length is too long
-            s_length_t1 = 10
-        if s_length_t0 > 10:  # if trace length is too long
-            s_length_t0 = 10
-        try:
-            s_reward_t1 = reward[train_number]
-            s_reward_t0 = reward[train_number - 1]
-        except IndexError:
-            raise IndexError("s_reward wrong with index")
+        s_t1 = episodes[train_number]
+        if len(s_t1)>max_tl:
+            
+        
         train_number += 1
+        current_reward=[float(0), float(0)]
+        batch_return.append((s_t0, s_t1, current_reward, 0, 0))
         if train_number + 1 == train_len:
-            trace_length_index_t1 = s_length_t1 - 1
-            trace_length_index_t0 = s_length_t0 - 1
-            r_t0 = np.asarray([s_reward_t0[trace_length_index_t0]])
-            r_t1 = np.asarray([s_reward_t1[trace_length_index_t1]])
-            if r_t0 == [float(0)]:
-                r_t0_combine = [float(0), float(0), float(0)]
-                batch_return.append((s_t0, s_t1, r_t0_combine, s_length_t0, s_length_t1, 0, 0))
-
-                if r_t1 == float(0):
-                    r_t1_combine = [float(0), float(0), float(1)]
-                elif r_t1 == float(-1):
-                    r_t1_combine = [float(0), float(1), float(1)]
-                elif r_t1 == float(1):
-                    r_t1_combine = [float(1), float(0), float(1)]
-                else:
-                    raise ValueError("incorrect r_t1")
-                batch_return.append((s_t1, s_t1, r_t1_combine, s_length_t1, s_length_t1, 1, 0))
-
-            elif r_t0 == [float(-1)]:
-                r_t0_combine = [float(0), float(1), float(0)]
-                batch_return.append((s_t0, s_t1, r_t0_combine, s_length_t0, s_length_t1, 0, 0))
-
-                if r_t1 == float(0):
-                    r_t1_combine = [float(0), float(0), float(1)]
-                elif r_t1 == float(-1):
-                    r_t1_combine = [float(0), float(1), float(1)]
-                elif r_t1 == float(1):
-                    r_t1_combine = [float(1), float(0), float(1)]
-                else:
-                    raise ValueError("incorrect r_t1")
-                batch_return.append((s_t1, s_t1, r_t1_combine, s_length_t1, s_length_t1, 1, 0))
-
-            elif r_t0 == [float(1)]:
-                r_t0_combine = [float(1), float(0), float(0)]
-                batch_return.append((s_t0, s_t1, r_t0_combine, s_length_t0, s_length_t1, 0, 0))
-
-                if r_t1 == float(0):
-                    r_t1_combine = [float(0), float(0), float(1)]
-                elif r_t1 == float(-1):
-                    r_t1_combine = [float(0), float(1), float(1)]
-                elif r_t1 == float(1):
-                    r_t1_combine = [float(1), float(0), float(1)]
-                else:
-                    raise ValueError("incorrect r_t1")
-                batch_return.append((s_t1, s_t1, r_t1_combine, s_length_t1, s_length_t1, 1, 0))
-            else:
-                raise ValueError("r_t0 wrong value")
-
+            ##If end of game
+            if event_type==13:
+                batch_return.append((s_t1, s_t1, reward, 1, 0))
+            ##if home team rewarded
+            elif possesion==1:
+                final_reward=[float(reward), float(-reward)]
+            ##If away team rewarded
+            elif possesion==-1:
+                final_reward=[float(-reward), float(reward)]
+            
+            batch_return.append((s_t1, s_t1, final_reward, 0, 1))
             s_t0 = s_t1
             break
 
-        trace_length_index_t0 = s_length_t0 - 1
-        r_t0 = np.asarray([s_reward_t0[trace_length_index_t0]])
-        if r_t0 != [float(0)]:
-            # print r_t0
-            if r_t0 == [float(-1)]:
-                r_t0_combine = [float(0), float(1), float(0)]
-                batch_return.append((s_t0, s_t1, r_t0_combine, s_length_t0, s_length_t1, 0, 1))
-            elif r_t0 == [float(1)]:
-                r_t0_combine = [float(1), float(0), float(0)]
-                batch_return.append((s_t0, s_t1, r_t0_combine, s_length_t0, s_length_t1, 0, 1))
-            else:
-                raise ValueError("r_t0 wrong value")
-            s_t0 = s_t1
-            break
-        r_t0_combine = [float(0), float(0), float(0)]
-        batch_return.append((s_t0, s_t1, r_t0_combine, s_length_t0, s_length_t1, 0, 0))
         current_batch_length += 1
         s_t0 = s_t1
 
     return batch_return, train_number, s_t0
+# def get_together_training_batch(s_t0, state_input, reward, train_number, train_len, state_trace_length, BATCH_SIZE):
+#     """
+#     we generate the training batch, your can write your own method.
+#     in our dataset, 1 means home score, -1 means away score, we transfer it to one-hot representation:
+#     reward  = [If_home_score, If_away_score, If_NeitherTeam_score]
+#     :return:
+#     batch_return is [s,s',r,s_play_length,s'_play_length, if_game_end, if_score_in_the_last_time_step]
+#     train_number is the current where we stop training
+#     s_t0 is the s for the next batch
+#     """
+#     batch_return = []
+#     current_batch_length = 0
+#     while current_batch_length < BATCH_SIZE:
+#         s_t1 = state_input[train_number]
+#         if len(s_t1) < 10 or len(s_t0) < 10:
+#             raise ValueError("wrong length of s")
+#             # train_number += 1
+#             # continue
+#         s_length_t1 = state_trace_length[train_number]
+#         s_length_t0 = state_trace_length[train_number - 1]
+#         if s_length_t1 > :  # if trace length is too long
+#             s_length_t1 = 10
+#         if s_length_t0 > 10:  # if trace length is too long
+#             s_length_t0 = 10
+#         try:
+#             s_reward_t1 = reward[train_number]
+#             s_reward_t0 = reward[train_number - 1]
+#         except IndexError:
+#             raise IndexError("s_reward wrong with index")
+#         train_number += 1
+#         if train_number + 1 == train_len:
+#             trace_length_index_t1 = s_length_t1 - 1
+#             trace_length_index_t0 = s_length_t0 - 1
+#             r_t0 = np.asarray([s_reward_t0[trace_length_index_t0]])
+#             r_t1 = np.asarray([s_reward_t1[trace_length_index_t1]])
+#             if r_t0 == [float(0)]:
+#                 r_t0_combine = [float(0), float(0), float(0)]
+#                 batch_return.append((s_t0, s_t1, r_t0_combine, s_length_t0, s_length_t1, 0, 0))
+
+#                 if r_t1 == float(0):
+#                     r_t1_combine = [float(0), float(0), float(1)]
+#                 elif r_t1 == float(-1):
+#                     r_t1_combine = [float(0), float(1), float(1)]
+#                 elif r_t1 == float(1):
+#                     r_t1_combine = [float(1), float(0), float(1)]
+#                 else:
+#                     raise ValueError("incorrect r_t1")
+#                 batch_return.append((s_t1, s_t1, r_t1_combine, s_length_t1, s_length_t1, 1, 0))
+
+#             elif r_t0 == [float(-1)]:
+#                 r_t0_combine = [float(0), float(1), float(0)]
+#                 batch_return.append((s_t0, s_t1, r_t0_combine, s_length_t0, s_length_t1, 0, 0))
+
+#                 if r_t1 == float(0):
+#                     r_t1_combine = [float(0), float(0), float(1)]
+#                 elif r_t1 == float(-1):
+#                     r_t1_combine = [float(0), float(1), float(1)]
+#                 elif r_t1 == float(1):
+#                     r_t1_combine = [float(1), float(0), float(1)]
+#                 else:
+#                     raise ValueError("incorrect r_t1")
+#                 batch_return.append((s_t1, s_t1, r_t1_combine, s_length_t1, s_length_t1, 1, 0))
+
+#             elif r_t0 == [float(1)]:
+#                 r_t0_combine = [float(1), float(0), float(0)]
+#                 batch_return.append((s_t0, s_t1, r_t0_combine, s_length_t0, s_length_t1, 0, 0))
+
+#                 if r_t1 == float(0):
+#                     r_t1_combine = [float(0), float(0), float(1)]
+#                 elif r_t1 == float(-1):
+#                     r_t1_combine = [float(0), float(1), float(1)]
+#                 elif r_t1 == float(1):
+#                     r_t1_combine = [float(1), float(0), float(1)]
+#                 else:
+#                     raise ValueError("incorrect r_t1")
+#                 batch_return.append((s_t1, s_t1, r_t1_combine, s_length_t1, s_length_t1, 1, 0))
+#             else:
+#                 raise ValueError("r_t0 wrong value")
+
+#             s_t0 = s_t1
+#             break
+
+#         trace_length_index_t0 = s_length_t0 - 1
+#         r_t0 = np.asarray([s_reward_t0[trace_length_index_t0]])
+#         if r_t0 != [float(0)]:
+#             # print r_t0
+#             if r_t0 == [float(-1)]:
+#                 r_t0_combine = [float(0), float(1), float(0)]
+#                 batch_return.append((s_t0, s_t1, r_t0_combine, s_length_t0, s_length_t1, 0, 1))
+#             elif r_t0 == [float(1)]:
+#                 r_t0_combine = [float(1), float(0), float(0)]
+#                 batch_return.append((s_t0, s_t1, r_t0_combine, s_length_t0, s_length_t1, 0, 1))
+#             else:
+#                 raise ValueError("r_t0 wrong value")
+#             s_t0 = s_t1
+#             break
+#         r_t0_combine = [float(0), float(0), float(0)]
+#         batch_return.append((s_t0, s_t1, r_t0_combine, s_length_t0, s_length_t1, 0, 0))
+#         current_batch_length += 1
+#         s_t0 = s_t1
+
+#     return batch_return, train_number, s_t0
 
 
 def padding_hybrid_feature_input(hybrid_feature_input):
