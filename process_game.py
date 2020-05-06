@@ -64,7 +64,7 @@ class GameProcessor:
         df_n = self.df_evt[self.df_evt.EVENTNUM == evt_num]
         if df_n.empty:
             return None
-        event = self.df_evt['EVENTMSGTYPE'].iloc[0]
+        event = df_n['EVENTMSGTYPE'].iloc[0]
         print("event:",event)
         reward = self.reward_map[event]
         print("reward:",reward)
