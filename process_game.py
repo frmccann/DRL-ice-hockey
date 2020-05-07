@@ -65,9 +65,9 @@ class GameProcessor:
         if df_n.empty:
             return None
         event = df_n['EVENTMSGTYPE'].iloc[0]
-        print("event:",event)
+        # print("event:",event)
         reward = self.reward_map[event]
-        print("reward:",reward)
+        # print("reward:",reward)
         observations = []
         actions_1 = []
         actions_2 = []
@@ -104,6 +104,8 @@ class GameProcessor:
             # action_2 = full_action[6:11] + full_action[17:]
             # actions_1.append(action_1)
             # actions_2.append(action_2)
+            if nan_check(observation):
+                print("NANNNNN!")
             observations.append(observation)
 
         # return reward, np.array(observations), np.array(actions_1), np.array(actions_2)
@@ -127,12 +129,20 @@ reward_map = {
 }
 
 
+def nan_check(observation):
+    nans=False
+    array_sum = np.sum(observation)
+    array_has_nan = np.isnan(array_sum)
+    nans=nans or array_has_nan
+    return(nans)
+
 def test():
     csv_movement = '../nba-movement-data/data/csv/0021500490.csv'
     csv_event = '../nba-movement-data/data/events/0021500490.csv'
     gp = GameProcessor(csv_movement, csv_event, reward_map)
     episodes= gp.process_game()
-    np.save('./pickles/test',episodes,allow_pickle=True,fix_imports=True)
+    print("nans?:",nan_check(episodes))
+    np.save('./test',episodes,allow_pickle=True,fix_imports=True)
 
     # r, o, l = gp.process_game()[1]
     # print('r', r)
