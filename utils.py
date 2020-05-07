@@ -157,7 +157,6 @@ def get_together_training_sequence_nba(s_t0, episodes, reward, train_number, tra
 
 #     return batch_return, train_number, s_t0
 
-
 def padding_hybrid_feature_input(hybrid_feature_input):
     """
     padding the empty state features with 0 (states won't be traced by Dynamic LSTM)

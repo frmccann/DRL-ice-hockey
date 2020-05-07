@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from configuration import *
 from utils import *
+
 class GameProcessor:
     def __init__(self, csv_movement, csv_event, reward_map, sample_factor=10):
         self.csv_movement = csv_movement
