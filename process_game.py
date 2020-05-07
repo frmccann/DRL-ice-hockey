@@ -87,6 +87,7 @@ class GameProcessor:
         if tl<MAX_TRACE_LENGTH:
             for i in range(0,MAX_TRACE_LENGTH-tl):
                 observations.append(np.zeros(24))
+        prev_shot_clock = 24
         for i in indices[start_idx:]:
 
             rows = episode[i:i+11]
