@@ -23,6 +23,9 @@ class GameProcessor:
     def rolling_average(self, num_average):
         pass
 
+    def get_possession(observation):
+        team1_pos = observation
+
     def process_game(self):
         self.df_mvmt = self.sample()
         episodes = self.create_episodes()
@@ -87,12 +90,18 @@ class GameProcessor:
         for i in indices[start_idx:]:
 
             rows = episode[i:i+11]
+
+            shot_clock = rows['shot_clock'].iloc[0]
+            if np.isnan(shot_clock):
+                shot_clock = prev_shot_clock
+            else:
+                prev_shot_clock = shot_clock
             # print('rows', rows)
             # print('ss', rows['shot_clock'])
             observation = np.zeros(24)
             observation[:2] = [
                 rows['shot_clock'].iloc[0],
-                rows['game_clock'].iloc[0],
+                shot_clock,
             ]
             observation[2:13] = rows['x_loc']
             observation[13:] = rows['y_loc']
