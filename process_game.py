@@ -36,7 +36,7 @@ class GameProcessor:
             idx+=1
             try:
                 processed_ep = self.process_episode(episode)
-                if processed_ep not None:
+                if processed_ep is not None:
                     chunks.append(processed_ep)
             except Exception as e: 
                 errors+=1
