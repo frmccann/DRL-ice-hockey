@@ -185,10 +185,10 @@ def train_network(sess, model):
                         print("TIMESTEP:", train_number, "Game:", game_number)
                         home_avg = sum(read_out[:, 0]) / len(read_out[:, 0])
                         away_avg = sum(read_out[:, 1]) / len(read_out[:, 1])
-                        end_avg = sum(read_out[:, 2]) / len(read_out[:, 2])
-                        print("home average:{0}, away average:{1}, end average:{2}".format(str(home_avg), str(away_avg),
-                                                                                        str(end_avg)))
-                        print("cost of the network is" + str(cost_out))
+                        # end_avg = sum(read_out[:, 2]) / len(read_out[:, 2])
+                        print("home average:{0}, away average:{1}".format(str(home_avg), str(away_avg)
+                                                                                        ))
+                        print("cost of the network is " + str(cost_out))
 
                     if terminal:
                         # save progress after a game

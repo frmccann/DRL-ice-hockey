@@ -13,7 +13,7 @@ def handle_trace_length(state_trace_length):
             trace_length_record.append(sub_length + 1)
 
     return trace_length_record
-def get_nba_possessesopm_batch(s_t0, episode, reward, train_number, train_lens, events_type,possesion,BATCH_SIZE):
+def get_nba_possessesion_batch(s_t0, possesion, reward, train_number, train_lens, events_type,home,BATCH_SIZE):
     """
     we generate the training batch, your can write your own method.
     in our dataset, 1 means home score, -1 means away score, we transfer it to one-hot representation:
@@ -27,34 +27,16 @@ def get_nba_possessesopm_batch(s_t0, episode, reward, train_number, train_lens, 
     batch_return = []
     current_batch_length = 0
     while current_batch_length < BATCH_SIZE:
-        reward=rewards[train_number]
-        event_type=events_type[train_number]
-        # print("train number:",train_number)
-        # print("epsiodes:",len(episodes))
-        # print("Event_type:",events_type[train_number])
-        s_t1 = episodes[train_number]
+        s_t1 = possesion[train_number]
         # if len(s_t1) < 10 or len(s_t0) < 10:
         #     raise ValueError("wrong length of s")
 
         train_number += 1
         s_length_t1 = train_lens[train_number]
         s_length_t0 = train_lens[train_number - 1]
-
-        ##if home_team rewarded
-        if possesion==1:
-            current_reward=[float(reward), float(-reward)]
-        ##If away team rewarded
-        elif possesion==-1:
-            current_reward=[float(-reward), float(reward)]
-        ##If score in last timestep
-        if event_type in set([1,3]):
-            batch_return.append((s_t0, s_t1,current_reward, s_length_t0,s_length_t1, 0, 1))
-            s_t0 = s_t1
-            break
-        else:
-            batch_return.append((s_t0, s_t1,current_reward, s_length_t0,s_length_t1, 0, 0))
-
-        if train_number + 1 == len(episodes):
+        current_reward=[float(0), float(0)]
+        batch_return.append((s_t1, s_t1, final_reward,s_length_t0,s_length_t1, 0, 0))
+        if train_number + 1 == len(possesion):
             reward=rewards[train_number]
             ##If end of game
             if event_type==13:
@@ -123,11 +105,13 @@ def get_together_training_batch_nba(s_t0, episodes, rewards, train_number, train
             ##if home team rewarded
             elif possesion==1:
                 final_reward=[float(reward), float(-reward)]
+                batch_return.append((s_t1, s_t1, final_reward,s_length_t0,s_length_t1, 1, 1))
             ##If away team rewarded
             elif possesion==-1:
                 final_reward=[float(-reward), float(reward)]
+                batch_return.append((s_t1, s_t1, final_reward,s_length_t0,s_length_t1, 1, 1))
             
-            batch_return.append((s_t1, s_t1, final_reward,s_length_t0,s_length_t1, 0, 1))
+            # batch_return.append((s_t1, s_t1, final_reward,s_length_t0,s_length_t1, 0, 1))
             s_t0 = s_t1
             break
 
