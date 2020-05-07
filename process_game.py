@@ -2,7 +2,6 @@ import csv
 import pandas as pd
 import numpy as np
 from configuration import *
-from utils import *
 class GameProcessor:
     def __init__(self, csv_movement, csv_event, reward_map, sample_factor=10, trace_length=5):
         self.csv_movement = csv_movement
@@ -117,8 +116,6 @@ class GameProcessor:
             # action_2 = full_action[6:11] + full_action[17:]
             # actions_1.append(action_1)
             # actions_2.append(action_2)
-            if nan_check(observation):
-                print("NANNN")
             observations.append(observation)
 
         observations, final_trace_length = padded_chunks(np.array(observations), self.trace_length)
