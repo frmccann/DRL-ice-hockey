@@ -3,12 +3,13 @@ import pandas as pd
 import numpy as np
 from configuration import *
 class GameProcessor:
-    def __init__(self, csv_movement, csv_event, reward_map, sample_factor=10):
+    def __init__(self, csv_movement, csv_event, reward_map, sample_factor=10, trace_length=5):
         self.csv_movement = csv_movement
         self.df_mvmt = pd.read_csv(csv_movement)
         self.df_evt = pd.read_csv(csv_event)
         self.reward_map = reward_map
         self.sample_factor = sample_factor
+        self.trace_length = trace_length
 
     def sample(self):
         data = []
@@ -36,7 +37,7 @@ class GameProcessor:
             idx+=1
             try:
                 processed_ep = self.process_episode(episode)
-                if processed_ep not None:
+                if processed_ep is not None:
                     chunks.append(processed_ep)
             except Exception as e: 
                 errors+=1
@@ -78,17 +79,18 @@ class GameProcessor:
         # print('ep', episode)
         indices = range(episode.shape[0])[::11]
         tl=len(indices)
-        if tl>MAX_TRACE_LENGTH:
-            start_idx=tl-MAX_TRACE_LENGTH
-        else:
-            start_idx=0
+        # if tl>MAX_TRACE_LENGTH:
+        #     start_idx=tl-MAX_TRACE_LENGTH
+        # else:
+        #     start_idx=0
 
         
-        if tl<MAX_TRACE_LENGTH:
-            for i in range(0,MAX_TRACE_LENGTH-tl):
-                observations.append(np.zeros(24))
+        # if tl<MAX_TRACE_LENGTH:
+        #     for i in range(0,MAX_TRACE_LENGTH-tl):
+        #         observations.append(np.zeros(24))
+
         prev_shot_clock = 24
-        for i in indices[start_idx:]:
+        for i in indices:
 
             rows = episode[i:i+11]
 
@@ -101,8 +103,8 @@ class GameProcessor:
             # print('ss', rows['shot_clock'])
             observation = np.zeros(24)
             observation[:2] = [
-                rows['shot_clock'].iloc[0],
                 shot_clock,
+                rows['game_clock'].iloc[0],
             ]
             observation[2:13] = rows['x_loc']
             observation[13:] = rows['y_loc']
@@ -116,9 +118,21 @@ class GameProcessor:
             # actions_2.append(action_2)
             observations.append(observation)
 
-        # return reward, np.array(observations), np.array(actions_1), np.array(actions_2)
-        return reward, np.array(observations), len(observations),event
+        observations, final_trace_length = padded_chunks(np.array(observations), self.trace_length)
+        # return reward, np.array(observations), np.array(actions_1), np.array(actions_2), final_trace_length
+        return reward, np.array(observations), len(observations), event, final_trace_length
 
+def padded_chunks(l, n):
+    """Yield successive n-sized chunks from l."""
+    tl = n
+    out = []
+    for i in range(0, len(l), n):
+        if i + n > len(l):
+            tl = n - (len(l) - i)
+            out.append(np.pad(np.array(l[i:]), ((0, tl), (0, 0)), 'constant'))
+        else:
+            out.append(np.array(l[i:i + n]))
+    return out, tl
 
 reward_map = {
     1: 2,
