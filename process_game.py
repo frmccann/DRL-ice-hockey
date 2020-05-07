@@ -102,8 +102,8 @@ class GameProcessor:
             # print('ss', rows['shot_clock'])
             observation = np.zeros(24)
             observation[:2] = [
-                rows['shot_clock'].iloc[0],
                 shot_clock,
+                rows['game_clock'].iloc[0],
             ]
             observation[2:13] = rows['x_loc']
             observation[13:] = rows['y_loc']
