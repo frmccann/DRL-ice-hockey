@@ -1,12 +1,11 @@
 import csv
 import tensorflow as tf
-from process_game import nan_check
 import os
 import scipy.io as sio
 import numpy as np
 from nn.td_prediction_lstm_V3 import td_prediction_lstm_V3
 from nn.td_prediction_lstm_V4 import td_prediction_lstm_V4
-from utils import *
+from utils import handle_trace_length, get_together_training_batch_nba, compromise_state_trace_length
 from configuration import MODEL_TYPE, MAX_TRACE_LENGTH, FEATURE_NUMBER, BATCH_SIZE, GAMMA, H_SIZE, model_train_continue, FEATURE_TYPE, ITERATE_NUM, learning_rate, SPORT, save_mother_dir
 
 LOG_DIR = save_mother_dir + "/log/Scale-three-cut_together_log_train_feature" + str(
@@ -121,42 +120,77 @@ def train_network(sess, model):
                 game_info_list.append(np.load("./pickles/test.npy",allow_pickle=True))               
 
             for game in game_info_list:
-                print("CHECK FOR NANS:",nan_check(game))
-                rewards=list(game[:,0])
-                episodes=list(game[:,1])
-                trace_lengths=list(game[:,2])
-                event_types=list(game[:,3])
-                train_number=0
-                s_t0 = episodes[train_number]
-                
-                while True:
-                    print("LOOPED")
-                    # try:
-                    batch_return, train_number, s_tl = get_together_training_batch_nba(s_t0,episodes,rewards,train_number,trace_lengths,event_types,1,BATCH_SIZE)
+                for reward, observations, sequence_length,event_type in game:
+                    train_number=0
+                    s_t0 = observations[train_number]
+                    
+                    while True:
+                        # try:
+                        batch_return, train_number, s_tl = get_together_training_batch_nba(s_t0,observations,reward,train_number,sequence_length,1,event_type,BATCH_SIZE)
 
-                    # get the batch variables
-                    s_t0_batch = [d[0] for d in batch_return]
-                    s_t1_batch = [d[1] for d in batch_return]
-                    r_t_batch = [d[2] for d in batch_return]
-                    trace_t0_batch=[d[3] for d in batch_return]
-                    trace_t1_batch=[d[4] for d in batch_return]
-                    # trace_t0_batch = [d[3] for d in batch_return]
-                    # trace_t1_batch = [d[4] for d in batch_return]
-                    y_batch = []
+                        # get the batch variables
+                        s_t0_batch = [d[0] for d in batch_return]
+                        s_t1_batch = [d[1] for d in batch_return]
+                        r_t_batch = [d[2] for d in batch_return]
+                        trace_t0_batch=[1 for i in s_t0_batch]
+                        trace_t1_batch=[1 for i in s_t1_batch]
+                        # trace_t0_batch = [d[3] for d in batch_return]
+                        # trace_t1_batch = [d[4] for d in batch_return]
+                        y_batch = []
 
-                    [outputs_t1, readout_t1_batch] = sess.run([model.outputs, model.read_out],
-                                                            feed_dict={model.trace_lengths: trace_t1_batch,model.rnn_input: s_t1_batch})
+                        [outputs_t1, readout_t1_batch] = sess.run([model.outputs, model.read_out],
+                                                                feed_dict={model.trace_lengths: trace_t1_batch,
+                                                                            model.rnn_input: s_t1_batch})
 
-                    for i in range(0, len(batch_return)):
-                        terminal = batch_return[i][-2]
-                        cut = batch_return[i][-1]
-                        # if terminal, only equals reward
-                        if terminal or cut:
-                            y_home = float((r_t_batch[i])[0])
-                            y_away = float((r_t_batch[i])[1])
-                            y_batch.append([y_home, y_away])
-                            print(i,y_home,y_away)
+                        for i in range(0, len(batch_return)):
+                            terminal = batch_return[i][3]
+                            cut = batch_return[i][4]
+                            # if terminal, only equals reward
+                            if terminal or cut:
+                                y_home = float((r_t_batch[i])[0])
+                                y_away = float((r_t_batch[i])[1])
+                                y_batch.append([y_home, y_away])
+                                break
+                            else:
+                                y_home = float((r_t_batch[i])[0]) + GAMMA * ((readout_t1_batch[i]).tolist())[0]
+                                y_away = float((r_t_batch[i])[1]) + GAMMA * ((readout_t1_batch[i]).tolist())[1]
+                    
+                                y_batch.append([y_home, y_away])
+
+                        # perform gradient step
+                        y_batch = np.asarray(y_batch)
+                        [diff, read_out, cost_out, summary_train, _] = sess.run(
+                            [model.diff, model.read_out, model.cost, merge, model.train_step],
+                            feed_dict={model.y: y_batch,
+                                    model.trace_lengths: trace_t0_batch,
+                                    model.rnn_input: s_t0_batch})
+
+                        v_diff_record.append(diff)
+
+                        if cost_out > 0.0001:
+                            converge_flag = False
+                        global_counter += 1
+                        game_cost_record.append(cost_out)
+                        train_writer.add_summary(summary_train, global_step=global_counter)
+                        s_t0 = s_tl
+
+                        # print info
+                        if terminal or ((train_number - 1) / BATCH_SIZE) % 5 == 1:
+                            print("TIMESTEP:", train_number, "Game:", game_number)
+                            home_avg = sum(read_out[:, 0]) / len(read_out[:, 0])
+                            away_avg = sum(read_out[:, 1]) / len(read_out[:, 1])
+                            end_avg = sum(read_out[:, 2]) / len(read_out[:, 2])
+                            print("home average:{0}, away average:{1}, end average:{2}".format(str(home_avg), str(away_avg),
+                                                                                            str(end_avg)))
+                            print("cost of the network is" + str(cost_out))
+
+                        if terminal:
+                            # save progress after a game
+                            saver.save(sess, SAVED_NETWORK + '/' + SPORT + '-game-', global_step=game_number)
+                            v_diff_record_average = sum(v_diff_record) / len(v_diff_record)
+                            game_diff_record_dict.update({dir_game: v_diff_record_average})
                             break
+<<<<<<< HEAD
                         else:
                             y_home = float((r_t_batch[i])[0]) + GAMMA * ((readout_t1_batch[i]).tolist())[0]
                             y_away = float((r_t_batch[i])[1]) + GAMMA * ((readout_t1_batch[i]).tolist())[1]
@@ -201,6 +235,13 @@ def train_network(sess, model):
                 cost_per_game_average = sum(game_cost_record) / len(game_cost_record)
                 write_game_average_csv([{"iteration": str(game_number / number_of_total_game + 1), "game": game_number,
                                         "cost_per_game_average": cost_per_game_average}])
+=======
+
+                            # break
+                    cost_per_game_average = sum(game_cost_record) / len(game_cost_record)
+                    write_game_average_csv([{"iteration": str(game_number / number_of_total_game + 1), "game": game_number,
+                                            "cost_per_game_average": cost_per_game_average}])
+>>>>>>> 0fa4fcc32ddffd06e41ba304f15d3c1ffe9c609c
 
         game_diff_record_all.append(game_diff_record_dict)
 
