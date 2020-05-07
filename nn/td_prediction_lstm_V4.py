@@ -1,5 +1,5 @@
 import tensorflow as tf
-
+from configuration import *
 
 class td_prediction_lstm_V4:
     def __init__(self, FEATURE_NUMBER, H_SIZE, MAX_TRACE_LENGTH, learning_rate, rnn_type='bp_last_step'):
@@ -7,7 +7,8 @@ class td_prediction_lstm_V4:
         define a dynamic LSTM
         """
         with tf.name_scope("LSTM_layer"):
-            self.rnn_input = tf.placeholder(tf.float32, [None, 10, FEATURE_NUMBER], name="x_1")
+            ##changed 10 to MAX_TRACE_LENGTH
+            self.rnn_input = tf.placeholder(tf.float32, [None,MAX_TRACE_LENGTH, FEATURE_NUMBER], name="x_1")
             self.trace_lengths = tf.placeholder(tf.int32, [None], name="tl")
 
             self.lstm_cell = tf.contrib.rnn.LSTMCell(num_units=H_SIZE * 2, state_is_tuple=True,
@@ -29,7 +30,7 @@ class td_prediction_lstm_V4:
 
         num_layer_1 = H_SIZE * 2
         num_layer_2 = 1000
-        num_layer_3 = 3
+        num_layer_3 = 2
 
         with tf.name_scope("Dense_Layer_first"):
             self.W1 = tf.get_variable('w1_xaiver', [num_layer_1, num_layer_2],
@@ -43,7 +44,7 @@ class td_prediction_lstm_V4:
                                       initializer=tf.contrib.layers.xavier_initializer())
             self.b2 = tf.Variable(tf.zeros([num_layer_3]), name="b_2")
             self.read_out = tf.matmul(self.activation1, self.W2) + self.b2
-            # self.activation1 = tf.nn.relu(self.y1, name='activation')
+
 
         self.y = tf.placeholder("float", [None, num_layer_3])
 
