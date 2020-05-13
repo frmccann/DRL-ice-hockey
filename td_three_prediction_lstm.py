@@ -5,15 +5,16 @@ import scipy.io as sio
 import numpy as np
 from nn.td_prediction_lstm_V3 import td_prediction_lstm_V3
 from nn.td_prediction_lstm_V4 import td_prediction_lstm_V4
-from utils import handle_trace_length, get_together_training_batch_nba, compromise_state_trace_length
+from utils import *
 from configuration import MODEL_TYPE, MAX_TRACE_LENGTH, FEATURE_NUMBER, BATCH_SIZE, GAMMA, H_SIZE, model_train_continue, FEATURE_TYPE, ITERATE_NUM, learning_rate, SPORT, save_mother_dir
+tf.debugging.set_log_device_placement(True)
 
-LOG_DIR = save_mother_dir + "/log/Scale-three-cut_together_log_train_feature" + str(
+LOG_DIR = save_mother_dir + "/log/logging" + str(
     FEATURE_TYPE) + "_batch" + str(
     BATCH_SIZE) + "_iterate" + str(
     ITERATE_NUM) + "_lr" + str(
     learning_rate) + "_" + str(MODEL_TYPE) + "_MaxTL" + str(MAX_TRACE_LENGTH)
-SAVED_NETWORK = save_mother_dir + "/log/Scale-three-cut_together_saved_networks_feature" + str(
+SAVED_NETWORK = save_mother_dir + "/log/saved_networks_feature" + str(
     FEATURE_TYPE) + "_batch" + str(
     BATCH_SIZE) + "_iterate" + str(
     ITERATE_NUM) + "_lr" + str(
@@ -90,15 +91,15 @@ def train_network(sess, model):
             print("Could not find old network weights")
 
     game_diff_record_all = []
-
+    iteration_now=0
     ## Training loop
     while True:
         game_diff_record_dict = {}
-        iteration_now = game_number / number_of_total_game + 1
+        iteration_now +=1
         game_diff_record_dict.update({"Iteration": iteration_now})
         if converge_flag:
             break
-        elif game_number >= number_of_total_game * ITERATE_NUM:
+        elif ITERATE_NUM >  ITERATE_NUM:
             break
         else:
             converge_flag = True
@@ -119,14 +120,17 @@ def train_network(sess, model):
             for filename in game_files:
                 game_info_list.append(np.load("./pickles/test.npy",allow_pickle=True))               
 
-            for game in game_info_list:
-                for reward, observations, sequence_length,event_type in game:
-                    train_number=0
-                    s_t0 = observations[train_number]
+            for game_number,game in enumerate(game_info_list):
+
+                for reward, episode, episode_length,event_type,final_tl in game:
+                    # s_t0 = observations[train_number]
                     
-                    while True:
+                    possession_number=0
+                    s_t0 = episode[possession_number]
+                    possession_number+=1
+                    while possession_number<len(episode):
                         # try:
-                        batch_return, train_number, s_tl = get_together_training_batch_nba(s_t0,observations,reward,train_number,sequence_length,1,event_type,BATCH_SIZE)
+                        batch_return, possession_number, s_tl = get_nba_possessesion_batch(s_t0,episode,reward,possession_number,final_tl,1,event_type,BATCH_SIZE)
 
                         # get the batch variables
                         s_t0_batch = [d[0] for d in batch_return]
@@ -175,73 +179,25 @@ def train_network(sess, model):
                         s_t0 = s_tl
 
                         # print info
-                        if terminal or ((train_number - 1) / BATCH_SIZE) % 5 == 1:
-                            print("TIMESTEP:", train_number, "Game:", game_number)
-                            home_avg = sum(read_out[:, 0]) / len(read_out[:, 0])
-                            away_avg = sum(read_out[:, 1]) / len(read_out[:, 1])
-                            end_avg = sum(read_out[:, 2]) / len(read_out[:, 2])
-                            print("home average:{0}, away average:{1}, end average:{2}".format(str(home_avg), str(away_avg),
-                                                                                            str(end_avg)))
-                            print("cost of the network is" + str(cost_out))
+                        # if terminal or ((possession_number - 1) / BATCH_SIZE) % 5 == 1:
+                        #     print("TIMESTEP:", possession_number, "Game:", game_number)
+                        #     home_avg = sum(read_out[:, 0]) / len(read_out[:, 0])
+                        #     away_avg = sum(read_out[:, 1]) / len(read_out[:, 1])
+                            
+                        #     print("home average:{0}, away average:{1}".format(str(home_avg), str(away_avg)
+                        #                                                                         ))
+                        #     print("cost of the network is" + str(cost_out))
 
-                        if terminal:
-                            # save progress after a game
-                            saver.save(sess, SAVED_NETWORK + '/' + SPORT + '-game-', global_step=game_number)
-                            v_diff_record_average = sum(v_diff_record) / len(v_diff_record)
-                            game_diff_record_dict.update({dir_game: v_diff_record_average})
-                            break
-<<<<<<< HEAD
-                        else:
-                            y_home = float((r_t_batch[i])[0]) + GAMMA * ((readout_t1_batch[i]).tolist())[0]
-                            y_away = float((r_t_batch[i])[1]) + GAMMA * ((readout_t1_batch[i]).tolist())[1]
-
-                            y_batch.append([y_home, y_away])
-                        print(i,y_home,y_away)
-                    # perform gradient step
-                    y_batch = np.asarray(y_batch)
-                    [diff, read_out, cost_out, summary_train, _] = sess.run(
-                        [model.diff, model.read_out, model.cost, merge, model.train_step],
-                        feed_dict={model.y: y_batch,
-                                model.trace_lengths: trace_t0_batch,
-                                model.rnn_input: s_t0_batch})
-
-                    v_diff_record.append(diff)
-
-                    if cost_out > 0.0001:
-                        converge_flag = False
-                    global_counter += 1
-                    game_cost_record.append(cost_out)
-                    train_writer.add_summary(summary_train, global_step=global_counter)
-                    s_t0 = s_tl
-
-                    # print info
-                    if terminal or ((train_number - 1) / BATCH_SIZE) % 5 == 1:
-                        print("TIMESTEP:", train_number, "Game:", game_number)
-                        home_avg = sum(read_out[:, 0]) / len(read_out[:, 0])
-                        away_avg = sum(read_out[:, 1]) / len(read_out[:, 1])
-                        # end_avg = sum(read_out[:, 2]) / len(read_out[:, 2])
-                        print("home average:{0}, away average:{1}".format(str(home_avg), str(away_avg)
-                                                                                        ))
-                        print("cost of the network is " + str(cost_out))
-
-                    if terminal:
-                        # save progress after a game
-                        saver.save(sess, SAVED_NETWORK + '/' + SPORT + '-game-', global_step=game_number)
-                        v_diff_record_average = sum(v_diff_record) / len(v_diff_record)
-                        game_diff_record_dict.update({dir_game: v_diff_record_average})
-                        break
-
-                        # break
+                print("End of game:",game_number)
+                # save progress after a game
+                saver.save(sess, SAVED_NETWORK + '/' + SPORT + '-game-', global_step=game_number)
+                v_diff_record_average = sum(v_diff_record) / len(v_diff_record)
+                game_diff_record_dict.update({dir_game: v_diff_record_average})
+                
+                        
                 cost_per_game_average = sum(game_cost_record) / len(game_cost_record)
                 write_game_average_csv([{"iteration": str(game_number / number_of_total_game + 1), "game": game_number,
                                         "cost_per_game_average": cost_per_game_average}])
-=======
-
-                            # break
-                    cost_per_game_average = sum(game_cost_record) / len(game_cost_record)
-                    write_game_average_csv([{"iteration": str(game_number / number_of_total_game + 1), "game": game_number,
-                                            "cost_per_game_average": cost_per_game_average}])
->>>>>>> 0fa4fcc32ddffd06e41ba304f15d3c1ffe9c609c
 
         game_diff_record_all.append(game_diff_record_dict)
 

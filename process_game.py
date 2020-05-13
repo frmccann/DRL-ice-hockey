@@ -2,6 +2,7 @@ import csv
 import pandas as pd
 import numpy as np
 from configuration import *
+import os
 class GameProcessor:
     def __init__(self, csv_movement, csv_event, reward_map, sample_factor=10, trace_length=5):
         self.csv_movement = csv_movement
@@ -120,12 +121,12 @@ class GameProcessor:
             observations.append(observation)
             
             if i == 0:
-			    possession = get_possession(observation)
-			    # print('possession', p)
+                possession = get_possession(observation)
+                # print('possession', p)
                 
         observations, final_trace_length = padded_chunks(np.array(observations), self.trace_length)
         # return reward, np.array(observations), np.array(actions_1), np.array(actions_2), final_trace_length
-        return reward, np.array(observations), len(observations), event, final_trace_length #, possession
+        return reward, np.array(observations), len(observations), event, final_trace_length , possession
 
 def padded_chunks(l, n):
     """Yield successive n-sized chunks from l."""
@@ -166,12 +167,22 @@ reward_map = {
 
 
 def test():
-    csv_movement = '../nba-movement-data/data/csv/0021500490.csv'
-    csv_event = '../nba-movement-data/data/events/0021500490.csv'
-    gp = GameProcessor(csv_movement, csv_event, reward_map)
-    episodes= gp.process_game()
-    np.save('test',episodes,allow_pickle=True,fix_imports=True)
-
+    movement_files = os.listdir("../nba-movement-data/data/csv/")
+    event_files=os.listdir("../nba-movement-data/data/events/")
+    game_number=57
+    for movement_file,event_file in zip(movement_files[57:],event_files[57:]):
+        print("game:",game_number,movement_file,event_file)
+        print("progress:",game_number/len(movement_files))
+        csv_movement="../nba-movement-data/data/csv/"+movement_file
+        csv_event="../nba-movement-data/data/events/"+event_file
+        game_number+=1
+        gp = GameProcessor(csv_movement, csv_event, reward_map)
+        try:
+            episodes= gp.process_game()
+            np.save("./pickles/game_"+str(game_number),episodes,allow_pickle=True,fix_imports=True)
+        except:
+            game_number-=1
+            continue
     # r, o, l = gp.process_game()[1]
     # print('r', r)
     # print('o', o
