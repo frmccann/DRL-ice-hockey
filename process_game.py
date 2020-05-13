@@ -90,9 +90,10 @@ class GameProcessor:
         #         observations.append(np.zeros(24))
 
         prev_shot_clock = 24
-        for i in indices:
+        possession = 0
+        for i, idx in enumerate(indices):
 
-            rows = episode[i:i+11]
+            rows = episode[idx:idx+11]
 
             shot_clock = rows['shot_clock'].iloc[0]
             if np.isnan(shot_clock):
@@ -117,10 +118,14 @@ class GameProcessor:
             # actions_1.append(action_1)
             # actions_2.append(action_2)
             observations.append(observation)
-
+            
+            if i == 0:
+			    possession = get_possession(observation)
+			    # print('possession', p)
+                
         observations, final_trace_length = padded_chunks(np.array(observations), self.trace_length)
         # return reward, np.array(observations), np.array(actions_1), np.array(actions_2), final_trace_length
-        return reward, np.array(observations), len(observations), event, final_trace_length
+        return reward, np.array(observations), len(observations), event, final_trace_length #, possession
 
 def padded_chunks(l, n):
     """Yield successive n-sized chunks from l."""
@@ -133,6 +138,15 @@ def padded_chunks(l, n):
         else:
             out.append(np.array(l[i:i + n]))
     return out, tl
+
+def get_possession(observation):
+    xs = observation[3:13]
+    ys = observation[14:]
+
+    players = np.transpose([xs, ys])
+    ball = [observation[2], observation[13]]
+    dists = np.mean(np.square(players - ball), 1)
+    return 0 if np.argmin(dists) < 5 else 1
 
 reward_map = {
     1: 2,
