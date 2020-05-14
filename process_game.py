@@ -149,6 +149,10 @@ def get_possession(observation):
     dists = np.mean(np.square(players - ball), 1)
     return 0 if np.argmin(dists) < 5 else 1
 
+def get_team_ids(self):
+    tids = self.df_mvmt['team_id']
+    return tids[1], tids[6] # Home, away
+
 reward_map = {
     1: 2,
     2: 0,
