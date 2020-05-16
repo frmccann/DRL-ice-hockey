@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import csv
-
+from utils import *
 
 class Plotter():
 	def __init__(self, value_dict, team_csv):
@@ -15,7 +15,7 @@ class Plotter():
 		power_rankings = []
 		standings = []
 
-		i = 1
+		i = 0
 		for team_id in self.team_map:
 			name, power_ranking, standing = self.team_map[team_id]
 			team_names.append(name)
@@ -24,11 +24,15 @@ class Plotter():
 			if test:
 				q_vals.append((np.random.randint(1000), i))
 			else:
-				q_val, games, possessions, movements = self.value_dict[team_id]
-				q_vals.append((q_val, i))
+				info_dict = self.value_dict[int(team_id)]
+				q_val=info_dict['total_value']
+				games=info_dict['games']
+				possessions=info_dict["possesions"]
+				movements=info_dict["movements"]
+				q_vals.append((q_val/games, i))
 			i += 1
 		
-		q_val_rankings = [t[1] for t in sorted(q_vals)]
+		q_val_rankings = [t[1] for t in sorted(q_vals,reverse=True)]
 
 		plt.xlabel('Teams')
 		plt.ylabel('Ranking')
@@ -36,13 +40,13 @@ class Plotter():
 
 		# print(power_rankings)
 		plt.plot(range(len(team_names)), power_rankings, label='Standing', marker='o')
-		plt.plot(range(len(team_names)), q_val_rankings, label='Q Val Ranking', marker='o')
+		plt.plot(range(len(team_names)), q_val_rankings, label='Q Val per Game Ranking', marker='o')
 		plt.plot(range(len(team_names)), standings, label='Power Ranking', marker='o')
 		
 		plt.xticks(range(len(team_names)), team_names, size='small', rotation='vertical')
 		plt.legend()
 		plt.show()
-		plt.savefig('rankings_plot.png')
+		plt.savefig('rankings_game_plot.png')
 
 def read_team_csv(path):
 	teams = {}
@@ -54,9 +58,7 @@ def read_team_csv(path):
 	return teams
 
 team_csv = 'team_mapping.csv'
-test_value_dict = {
-	
-}
+test_value_dict = load_obj("team_eval_dict")
 plotter = Plotter(test_value_dict, team_csv)
 # print(plotter.team_map)
-plotter.compare_rankings(test=True)
+plotter.compare_rankings(test=False)

@@ -1,6 +1,13 @@
 import numpy as np
 from configuration import *
+import pickle 
+def save_obj(obj, name ):
+    with open(name + '.pkl', 'wb') as f:
+        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
+def load_obj(name ):
+    with open( name + '.pkl', 'rb') as f:
+        return pickle.load(f)
 
 def handle_trace_length(state_trace_length):
     """
@@ -46,7 +53,7 @@ def get_nba_possessesion_batch(s_t0, possesion, reward, possesion_number, final_
                 final_reward=[float(reward), float(-reward)]
                 batch_return.append((s_t1, s_t1, final_reward,s_length_t0,s_length_t1, 1, 1))
             ##If away team rewarded
-            elif home==-1:
+            else:
                 final_reward=[float(-reward), float(reward)]
                 batch_return.append((s_t1, s_t1, final_reward,s_length_t0,s_length_t1, 1, 1))
             

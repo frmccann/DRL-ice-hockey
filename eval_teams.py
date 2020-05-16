@@ -62,8 +62,8 @@ def eval_teams(sess, model):
     for game_number,game in enumerate(game_info_list[-num_teams:]):
         print(game_number)
         # try:
-        home_team=game_to_teams["./pickles/"+game_files[-num_teams+game_number][:-4]]
-        away_team=game_to_teams["./pickles/"+game_files[-num_teams+game_number][:-4]]
+        home_team=game_to_teams["./pickles/"+game_files[-num_teams+game_number][:-4]][0]
+        away_team=game_to_teams["./pickles/"+game_files[-num_teams+game_number][:-4]][1]
         if home_team not in team_q_values:
             team_q_values[home_team]={"games":0,"possesions":0,"total_value":0,"movements":0}
         if away_team not in team_q_values:

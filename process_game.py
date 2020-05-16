@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from configuration import *
 import os
+import pickle
 class GameProcessor:
     def __init__(self, csv_movement, csv_event, reward_map, sample_factor=10, trace_length=5):
         self.csv_movement = csv_movement
@@ -63,6 +64,9 @@ class GameProcessor:
                 episodes.append(episode)
         # print(episodes)
         return episodes
+    def get_team_ids(self):
+        tids = self.df_mvmt['team_id']
+        return tids[1], tids[6] # Home, away
 
     def process_episode(self, episode):
         evt_num = episode['event_id'].iloc[0]
@@ -70,9 +74,9 @@ class GameProcessor:
         if df_n.empty:
             return None
         event = df_n['EVENTMSGTYPE'].iloc[0]
-        print("event:",event)
+        # print("event:",event)
         reward = self.reward_map[event]
-        print("reward:",reward)
+        # print("reward:",reward)
         observations = []
         actions_1 = []
         actions_2 = []
@@ -149,9 +153,6 @@ def get_possession(observation):
     dists = np.mean(np.square(players - ball), 1)
     return 0 if np.argmin(dists) < 5 else 1
 
-def get_team_ids(self):
-    tids = self.df_mvmt['team_id']
-    return tids[1], tids[6] # Home, away
 
 reward_map = {
     1: 2,
@@ -169,26 +170,33 @@ reward_map = {
     13:0
 }
 
+def save_obj(obj, name ):
+    with open(name + '.pkl', 'wb') as f:
+        pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 
 def test():
     movement_files = os.listdir("../nba-movement-data/data/csv/")
     event_files=os.listdir("../nba-movement-data/data/events/")
-    game_number=57
-    for movement_file,event_file in zip(movement_files[57:],event_files[57:]):
+    game_to_teams={}
+    game_number=0
+    for movement_file,event_file in zip(movement_files[game_number:],event_files[game_number:]):
         print("game:",game_number,movement_file,event_file)
         print("progress:",game_number/len(movement_files))
         csv_movement="../nba-movement-data/data/csv/"+movement_file
         csv_event="../nba-movement-data/data/events/"+event_file
         game_number+=1
         gp = GameProcessor(csv_movement, csv_event, reward_map)
+        filename="./pickles/game_"+str(game_number)
         try:
-            episodes= gp.process_game()
-            np.save("./pickles/game_"+str(game_number),episodes,allow_pickle=True,fix_imports=True)
+            game_to_teams[filename]=tuple(gp.get_team_ids())
+            # episodes= gp.process_game()
+            # np.save(filename,episodes,allow_pickle=True,fix_imports=True)
         except:
             game_number-=1
             continue
     # r, o, l = gp.process_game()[1]
     # print('r', r)
     # print('o', o
-    
+    print(game_number)
+    save_obj(game_to_teams,"game_to_teams")
 test()
